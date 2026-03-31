@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HS → Shopify Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #08090b;
+  --s1:     #0e1014;
+  --s2:     #14161b;
+  --s3:     #1c1f26;
+  --border: rgba(255,255,255,0.06);
+  --b2:     rgba(255,255,255,0.11);
+  --green:  #00e5a0;
+  --green2: #00c98c;
+  --shopify:#95bf48;
+  --blue:   #4cc9f0;
+  --yellow: #ffd166;
+  --red:    #ff4d6d;
+  --text:   #e4e5e9;
+  --t2:     #7a7d88;
+  --t3:     #3a3d48;
+  --mono:   'IBM Plex Mono', monospace;
+  --sans:   'IBM Plex Sans', sans-serif;
+  --r:      8px;
+  --r2:     14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;}
+
+/* ── LAYOUT ── */
+.app{display:grid;grid-template-columns:260px 1fr;min-height:100vh;}
+.nav{background:var(--s1);border-right:1px solid var(--border);padding:0;display:flex;flex-direction:column;}
+.main{display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── NAV ── */
+.nav-logo{padding:20px 18px 16px;border-bottom:1px solid var(--border);}
+.logo-row{display:flex;align-items:center;gap:10px;}
+.logo-box{width:30px;height:30px;background:var(--green);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.logo-box svg{fill:#000;width:15px;height:15px;}
+.logo-name{font-size:13px;font-weight:700;letter-spacing:-0.3px;}
+.logo-sub{font-size:9px;color:var(--t3);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-top:1px;}
+
+.nav-steps{padding:14px 10px;flex:1;}
+.step-btn{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:none;border-radius:var(--r);cursor:pointer;background:none;color:var(--t2);font-family:var(--sans);font-size:12px;font-weight:500;transition:all 0.15s;margin-bottom:2px;position:relative;}
+.step-btn:hover{background:var(--s2);color:var(--text);}
+.step-btn.active{background:var(--s2);color:var(--text);}
+.step-btn.active .step-num{background:var(--green);color:#000;}
+.step-btn.done .step-num{background:var(--s3);color:var(--green);}
+.step-btn.done .step-num::after{content:'✓';}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--s3);color:var(--t3);font-family:var(--mono);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.step-done-icon{display:none;}
+.step-btn.done .step-done-icon{display:block;position:absolute;right:10px;color:var(--green);font-size:11px;}
+
+.nav-creds{padding:12px 10px 16px;border-top:1px solid var(--border);}
+.cred-title{font-size:9px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--t3);font-family:var(--mono);margin-bottom:8px;padding:0 2px;}
+.f{margin-bottom:8px;}
+.f label{font-size:10px;color:var(--t2);display:block;margin-bottom:4px;font-family:var(--mono);}
+.f input,.f select{width:100%;padding:7px 9px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:11px;outline:none;transition:border 0.15s;}
+.f input:focus,.f select:focus{border-color:var(--green);}
+.f input.shopify-field:focus{border-color:var(--shopify);}
+.f input::placeholder{color:var(--t3);}
+.f select option{background:#14161b;}
+
+/* ── MAIN ── */
+.page-header{padding:22px 28px 0;border-bottom:1px solid var(--border);padding-bottom:18px;}
+.page-title{font-size:20px;font-weight:700;letter-spacing:-0.5px;}
+.page-sub{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.5;}
+.content{padding:22px 28px;flex:1;overflow-y:auto;}
+
+/* ── PANELS ── */
+.panel{display:none;}
+.panel.active{display:block;}
+
+/* ── CARDS / BOXES ── */
+.box{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:20px;margin-bottom:16px;}
+.box-title{font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--mono);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.box-title .dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.box-title .dot.s{background:var(--shopify);}
+.box-title .dot.b{background:var(--blue);}
+.box-title .dot.y{background:var(--yellow);}
+
+/* ── INPUTS ── */
+.big-textarea{width:100%;min-height:120px;padding:10px 12px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:11px;outline:none;resize:vertical;line-height:1.6;transition:border .15s;}
+.big-textarea:focus{border-color:var(--green);}
+.big-textarea::placeholder{color:var(--t3);}
+.row{display:grid;gap:12px;}
+.row-2{grid-template-columns:1fr 1fr;}
+.row-3{grid-template-columns:1fr 1fr 1fr;}
+.row-4{grid-template-columns:1fr 1fr 1fr 1fr;}
+.field-full{margin-bottom:12px;}
+.field-full label{font-size:10px;color:var(--t2);display:block;margin-bottom:5px;font-family:var(--mono);}
+.field-full input,.field-full select{width:100%;padding:8px 10px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:11px;outline:none;transition:border .15s;}
+.field-full input:focus,.field-full select:focus{border-color:var(--green);}
+.field-full input::placeholder{color:var(--t3);}
+.field-full select option{background:#14161b;}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:var(--r);font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;}
+.btn-green{background:var(--green);color:#000;}
+.btn-green:hover{background:var(--green2);}
+.btn-green:disabled{background:var(--s3);color:var(--t3);cursor:not-allowed;}
+.btn-shopify{background:var(--shopify);color:#1a2200;}
+.btn-shopify:hover{background:#a8d455;}
+.btn-shopify:disabled{background:var(--s3);color:var(--t3);cursor:not-allowed;}
+.btn-ghost{background:var(--s2);color:var(--t2);border:1px solid var(--b2);}
+.btn-ghost:hover{background:var(--s3);color:var(--text);}
+.btn-sm{padding:6px 12px;font-size:11px;}
+.btn-full{width:100%;justify-content:center;}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+
+/* ── CHIPS ── */
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:10px;background:var(--s3);border:1px solid var(--b2);color:var(--t2);font-family:var(--mono);}
+.chip-x{cursor:pointer;color:var(--t3);font-size:13px;line-height:1;}
+.chip-x:hover{color:var(--red);}
+
+/* ── STATS BAR ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;}
+.stat-n{font-size:28px;font-weight:700;font-family:var(--mono);line-height:1;}
+.stat-n.g{color:var(--green);}
+.stat-n.b{color:var(--blue);}
+.stat-n.s{color:var(--shopify);}
+.stat-n.y{color:var(--yellow);}
+.stat-l{font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--mono);}
+
+/* ── PROGRESS ── */
+.progress-box{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:16px;margin-bottom:16px;display:none;}
+.progress-head{display:flex;justify-content:space-between;margin-bottom:8px;}
+.progress-label{font-size:11px;color:var(--t2);font-family:var(--mono);}
+.progress-track{height:2px;background:var(--s3);border-radius:99px;margin-bottom:8px;}
+.progress-fill{height:100%;border-radius:99px;transition:width .3s;}
+.progress-fill.green{background:var(--green);}
+.progress-fill.shopify{background:var(--shopify);}
+.log{font-family:var(--mono);font-size:10px;color:var(--t3);max-height:160px;overflow-y:auto;line-height:1.7;}
+.lg{color:var(--green);}
+.lr{color:var(--red);}
+.ly{color:var(--yellow);}
+.ls{color:var(--shopify);}
+.lb{color:var(--blue);}
+
+/* ── IMAGE GRID ── */
+.img-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;}
+.img-card{background:var(--s2);border:1px solid var(--border);border-radius:10px;overflow:hidden;animation:fadeUp .2s ease both;}
+.img-card img{width:100%;aspect-ratio:1;object-fit:contain;background:#fff;display:block;}
+.img-card-info{padding:7px 8px;}
+.img-card-view{font-size:14px;font-weight:700;font-family:var(--mono);}
+.img-card-sku{font-size:9px;color:var(--t3);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;}
+
+/* ── FILE DROP ZONE ── */
+.dropzone{border:2px dashed var(--b2);border-radius:var(--r2);padding:32px;text-align:center;cursor:pointer;transition:all .15s;}
+.dropzone:hover,.dropzone.drag{border-color:var(--shopify);background:rgba(149,191,72,0.04);}
+.dropzone-icon{font-size:32px;margin-bottom:10px;opacity:0.3;}
+.dropzone-title{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:4px;}
+.dropzone-sub{font-size:11px;color:var(--t3);font-family:var(--mono);}
+.dropzone input[type=file]{display:none;}
+.dropzone-file-name{font-family:var(--mono);font-size:11px;color:var(--shopify);margin-top:8px;}
+
+/* ── JSON OUTPUT ── */
+.json-out{background:var(--bg);border:1px solid var(--border);border-radius:var(--r2);padding:18px;font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--t2);max-height:480px;overflow:auto;white-space:pre;}
+.jk{color:#7dd3fc;}.js{color:#86efac;}.jn{color:#fbbf24;}
+.json-empty{text-align:center;padding:40px;color:var(--t3);font-family:var(--mono);font-size:11px;}
+
+/* ── NOTICE BOXES ── */
+.notice{border-radius:var(--r);padding:10px 14px;font-family:var(--mono);font-size:10px;line-height:1.7;margin-bottom:12px;}
+.notice.green{background:rgba(0,229,160,0.07);border:1px solid rgba(0,229,160,0.2);color:var(--green);}
+.notice.yellow{background:rgba(255,209,102,0.07);border:1px solid rgba(255,209,102,0.2);color:var(--yellow);}
+.notice.red{background:rgba(255,77,109,0.07);border:1px solid rgba(255,77,109,0.2);color:var(--red);}
+
+/* ── EMPTY ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;}
+.empty-icon{font-size:36px;opacity:.2;margin-bottom:12px;}
+.empty-title{font-size:15px;font-weight:600;color:var(--t2);margin-bottom:5px;}
+.empty-sub{font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.6;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--s2);border:1px solid var(--b2);border-radius:99px;padding:9px 18px;font-family:var(--mono);font-size:11px;color:var(--text);transition:transform .25s;z-index:9999;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:99px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── NAV ── -->
+<nav class="nav">
+  <div class="nav-logo">
+    <div class="logo-row">
+      <div class="logo-box">
+        <svg viewBox="0 0 16 16"><path d="M8 1L1 4v8l7 3 7-3V4L8 1zm0 2.2L13 5.5 8 7.8 3 5.5 8 3.2zM2.5 7l5 2.2v4.6l-5-2.2V7zm6 6.8V9.2l5-2.2v4.6l-5 2.2z"/></svg>
+      </div>
+      <div>
+        <div class="logo-name">HS → Shopify</div>
+        <div class="logo-sub">Image Pipeline</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-steps">
+    <button class="step-btn active" id="nav-1" onclick="goPanel(1)">
+      <div class="step-num">1</div> Probe SKUs
+      <span class="step-done-icon">✓</span>
+    </button>
+    <button class="step-btn" id="nav-2" onclick="goPanel(2)">
+      <div class="step-num">2</div> Edit &amp; Download Sheet
+      <span class="step-done-icon">✓</span>
+    </button>
+    <button class="step-btn" id="nav-3" onclick="goPanel(3)">
+      <div class="step-num">3</div> Upload to Shopify
+      <span class="step-done-icon">✓</span>
+    </button>
+    <button class="step-btn" id="nav-4" onclick="goPanel(4)">
+      <div class="step-num">4</div> Generate JSON
+      <span class="step-done-icon">✓</span>
+    </button>
+  </div>
+
+  <div class="nav-creds">
+    <div class="cred-title">Shopify Credentials</div>
+    <div class="f">
+      <label>Store domain</label>
+      <input type="text" id="shopify-store" class="shopify-field" placeholder="yourstore.myshopify.com">
+    </div>
+    <div class="f">
+      <label>Admin API token</label>
+      <input type="password" id="shopify-token" class="shopify-field" placeholder="shpat_…">
+    </div>
+    <div class="f">
+      <label>API version</label>
+      <select id="shopify-ver">
+        <option value="2025-01">2025-01 (latest)</option>
+        <option value="2024-10">2024-10</option>
+        <option value="2024-07">2024-07</option>
+      </select>
+    </div>
+  </div>
+</nav>
+
+<!-- ── MAIN ── -->
+<main class="main">
+
+  <!-- ══ PANEL 1: PROBE ══ -->
+  <div class="panel active" id="panel-1">
+    <div class="page-header">
+      <div class="page-title">Probe Humanscale Images</div>
+      <div class="page-sub">Enter SKUs to fetch all available product images from the Humanscale CDN</div>
+    </div>
+    <div class="content">
+
+      <div class="stats">
+        <div class="stat"><div class="stat-n g" id="st-skus">0</div><div class="stat-l">SKUs</div></div>
+        <div class="stat"><div class="stat-n g" id="st-found">0</div><div class="stat-l">Images found</div></div>
+        <div class="stat"><div class="stat-n b" id="st-views">—</div><div class="stat-l">Avg views/SKU</div></div>
+        <div class="stat"><div class="stat-n y" id="st-domain">APAC</div><div class="stat-l">Domain</div></div>
+      </div>
+
+      <div class="box">
+        <div class="box-title"><span class="dot"></span> SKUs &amp; Settings</div>
+
+        <div class="row row-2" style="margin-bottom:12px;">
+          <div>
+            <div class="field-full">
+              <label>Humanscale domain</label>
+              <select id="domain" onchange="updateDomainStat()">
+                <option value="apac.humanscale.com">APAC — apac.humanscale.com</option>
+                <option value="www.humanscale.com">Global — www.humanscale.com</option>
+                <option value="eu.humanscale.com">EU — eu.humanscale.com</option>
+                <option value="custom">Custom…</option>
+              </select>
+            </div>
+            <div class="field-full" id="custom-domain-field" style="display:none">
+              <label>Custom domain</label>
+              <input type="text" id="custom-domain" placeholder="uk.humanscale.com">
+            </div>
+          </div>
+          <div>
+            <div class="row row-2">
+              <div class="field-full">
+                <label>Image size (px)</label>
+                <select id="img-size">
+                  <option value="734">734</option>
+                  <option value="1200">1200</option>
+                  <option value="400">400</option>
+                </select>
+              </div>
+              <div class="field-full">
+                <label>Format</label>
+                <select id="img-fmt">
+                  <option value="png">PNG</option>
+                  <option value="jpg">JPG</option>
+                </select>
+              </div>
+              <div class="field-full">
+                <label>Max views</label>
+                <select id="max-views">
+                  <option value="10">10</option>
+                  <option value="15">15</option>
+                  <option value="20" selected>20</option>
+                  <option value="30">30</option>
+                </select>
+              </div>
+              <div class="field-full">
+                <label>Concurrency</label>
+                <select id="concurrency">
+                  <option value="10">10</option>
+                  <option value="20" selected>20</option>
+                  <option value="30">30</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-full">
+          <label>SKUs — one per line or comma separated</label>
+          <textarea class="big-textarea" id="sku-input" placeholder="S111BN43PS30XFSHNSC&#10;S111BN34PS02XFSHNSC&#10;…"></textarea>
+        </div>
+        <div class="chips" id="chips"></div>
+
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="addSkusToQueue()">+ Add to queue</button>
+          <button class="btn btn-green" id="probe-btn" onclick="runProbe()">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l10 6-10 6V2z"/></svg>
+            Probe images
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-box" id="probe-progress">
+        <div class="progress-head">
+          <span class="progress-label" id="probe-prog-label">Probing…</span>
+          <span class="progress-label" id="probe-prog-pct">0%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill green" id="probe-prog-fill" style="width:0%"></div></div>
+        <div class="log" id="probe-log"></div>
+      </div>
+
+      <!-- Results grid -->
+      <div id="probe-empty" class="empty">
+        <div class="empty-icon">◈</div>
+        <div class="empty-title">No images yet</div>
+        <div class="empty-sub">Enter SKUs above and click Probe images</div>
+      </div>
+      <div class="img-grid" id="img-grid" style="display:none"></div>
+
+    </div>
+  </div>
+
+  <!-- ══ PANEL 2: SHEET ══ -->
+  <div class="panel" id="panel-2">
+    <div class="page-header">
+      <div class="page-title">Edit &amp; Download Sheet</div>
+      <div class="page-sub">Download the Excel sheet, fill in Alt Text for each image, then return here to upload</div>
+    </div>
+    <div class="content">
+
+      <div class="notice yellow">
+        ★ Open the downloaded Excel file → fill in the <strong>Alt Text</strong> column for every image row → save → come back for Step 3
+      </div>
+
+      <div class="box">
+        <div class="box-title"><span class="dot y"></span> Download Sheet</div>
+        <div id="sheet-empty" class="empty" style="padding:30px 20px">
+          <div class="empty-icon">📋</div>
+          <div class="empty-title">Probe images first</div>
+          <div class="empty-sub">Complete Step 1 to generate the sheet</div>
+        </div>
+        <div id="sheet-ready" style="display:none">
+          <div class="row row-3" style="margin-bottom:14px;">
+            <div class="stat"><div class="stat-n g" id="sh-total">0</div><div class="stat-l">Total rows</div></div>
+            <div class="stat"><div class="stat-n b" id="sh-skus">0</div><div class="stat-l">SKUs</div></div>
+            <div class="stat"><div class="stat-n y" id="sh-fill">Fill Alt Text</div><div class="stat-l">Required action</div></div>
+          </div>
+          <div class="notice green">Sheet has 3 tabs: <strong>Images</strong> (fill Alt Text here) · <strong>Instructions</strong> · <strong>SKU Summary</strong></div>
+          <button class="btn btn-green btn-full" onclick="downloadSheet()">
+            ⬇ Download humanscale-images.xlsx
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PANEL 3: UPLOAD ══ -->
+  <div class="panel" id="panel-3">
+    <div class="page-header">
+      <div class="page-title">Upload to Shopify Files</div>
+      <div class="page-sub">Upload the filled Excel sheet — images are fetched from Humanscale CDN and pushed to your Shopify store</div>
+    </div>
+    <div class="content">
+
+      <div class="box">
+        <div class="box-title"><span class="dot s"></span> Upload Excel Sheet</div>
+
+        <label class="dropzone" id="dropzone" onclick="document.getElementById('sheet-file').click()">
+          <div class="dropzone-icon">📂</div>
+          <div class="dropzone-title">Drop your filled Excel sheet here</div>
+          <div class="dropzone-sub">humanscale-images.xlsx (with Alt Text filled in)</div>
+          <div class="dropzone-file-name" id="dz-filename"></div>
+          <input type="file" id="sheet-file" accept=".xlsx" onchange="onFileSelect(event)">
+        </label>
+
+        <div class="btn-group">
+          <button class="btn btn-shopify" id="upload-btn" onclick="runUpload()" disabled>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v9M4 7l4-5 4 5M2 14h12"/></svg>
+            Upload to Shopify
+          </button>
+          <button class="btn btn-ghost btn-sm" id="save-sheet-btn" onclick="saveUpdatedSheet()" style="display:none">
+            ⬇ Save updated sheet (with Shopify URLs)
+          </button>
+        </div>
+      </div>
+
+      <!-- Upload progress -->
+      <div class="progress-box" id="upload-progress">
+        <div class="progress-head">
+          <span class="progress-label" id="upload-prog-label">Uploading…</span>
+          <span class="progress-label" id="upload-prog-pct">0%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill shopify" id="upload-prog-fill" style="width:0%"></div></div>
+        <div class="log" id="upload-log"></div>
+      </div>
+
+      <div class="stats" id="upload-stats" style="display:none">
+        <div class="stat"><div class="stat-n s" id="up-ok">0</div><div class="stat-l">Uploaded</div></div>
+        <div class="stat"><div class="stat-n r" id="up-err">0</div><div class="stat-l">Errors</div></div>
+        <div class="stat"><div class="stat-n b" id="up-total">0</div><div class="stat-l">Total</div></div>
+        <div class="stat"><div class="stat-n g" id="up-pct">—</div><div class="stat-l">Success rate</div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ PANEL 4: JSON ══ -->
+  <div class="panel" id="panel-4">
+    <div class="page-header">
+      <div class="page-title">Generate JSON Metafield</div>
+      <div class="page-sub">Generate the metafield JSON from your uploaded sheet or from probe results</div>
+    </div>
+    <div class="content">
+
+      <div class="box">
+        <div class="box-title"><span class="dot b"></span> JSON Settings</div>
+        <div class="row row-3">
+          <div class="field-full">
+            <label>Source</label>
+            <select id="json-source">
+              <option value="upload">From uploaded sheet (Shopify URLs)</option>
+              <option value="probe">From probe results (CDN URLs)</option>
+            </select>
+          </div>
+          <div class="field-full">
+            <label>Key naming</label>
+            <select id="json-keymode">
+              <option value="altbase">Alt text (strip view #) — recommended</option>
+              <option value="sku">SKU column</option>
+              <option value="prefix">First word of alt text</option>
+            </select>
+          </div>
+          <div class="field-full" style="display:flex;align-items:flex-end;gap:8px;">
+            <button class="btn btn-green btn-full" onclick="generateJSON()">Generate JSON</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="box" id="json-box" style="display:none">
+        <div class="box-title" style="justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="dot b"></span> Metafield JSON
+            <span id="json-kc" style="font-size:10px;color:var(--t3);background:var(--s3);padding:2px 8px;border-radius:99px;font-family:var(--mono);">0 keys</span>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost btn-sm" onclick="copyJSON()">Copy</button>
+            <button class="btn btn-ghost btn-sm" onclick="downloadJSON()">⬇ .json</button>
+          </div>
+        </div>
+        <div class="json-out" id="json-out"></div>
+      </div>
+
+      <div id="json-empty" class="empty">
+        <div class="empty-icon">{}</div>
+        <div class="empty-title">No JSON yet</div>
+        <div class="empty-sub">Complete Steps 1–3, then click Generate JSON</div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+const S = {
+  skus:        [],
+  probeResults: [],   // { sku, view, url }
+  uploadedRows: [],   // rows after upload (with Shopify URLs)
+  jsonData:    {},
+  uploadedFile: null,
+};
+
+/* ════════════════════════════════════════
+   NAV
+════════════════════════════════════════ */
+function goPanel(n) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.step-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`panel-${n}`).classList.add('active');
+  document.getElementById(`nav-${n}`).classList.add('active');
+}
+
+/* ════════════════════════════════════════
+   STEP 1 — PROBE
+════════════════════════════════════════ */
+document.getElementById('domain').addEventListener('change', function() {
+  document.getElementById('custom-domain-field').style.display = this.value === 'custom' ? 'block' : 'none';
+  updateDomainStat();
+});
+
+function updateDomainStat() {
+  const v = document.getElementById('domain').value;
+  document.getElementById('st-domain').textContent =
+    v === 'apac.humanscale.com' ? 'APAC' :
+    v === 'eu.humanscale.com'   ? 'EU'   :
+    v === 'www.humanscale.com'  ? 'Global' : 'Custom';
+}
+
+function addSkusToQueue() {
+  const raw = document.getElementById('sku-input').value;
+  raw.split(/[\n,]+/).map(s => s.trim().toUpperCase()).filter(Boolean)
+     .forEach(s => { if (!S.skus.includes(s)) S.skus.push(s); });
+  document.getElementById('sku-input').value = '';
+  renderChips();
+}
+
+function removeSku(s) {
+  S.skus = S.skus.filter(x => x !== s);
+  renderChips();
+}
+
+function renderChips() {
+  document.getElementById('chips').innerHTML = S.skus.map(s =>
+    `<div class="chip">${s}<span class="chip-x" onclick="removeSku('${s}')">×</span></div>`
+  ).join('');
+}
+
+async function runProbe() {
+  addSkusToQueue();
+  if (!S.skus.length) { showToast('Enter at least one SKU'); return; }
+
+  const btn = document.getElementById('probe-btn');
+  btn.disabled = true;
+  btn.textContent = 'Probing…';
+
+  const prog = document.getElementById('probe-progress');
+  const fill = document.getElementById('probe-prog-fill');
+  const label = document.getElementById('probe-prog-label');
+  const pct   = document.getElementById('probe-prog-pct');
+  const log   = document.getElementById('probe-log');
+  prog.style.display = 'block'; log.innerHTML = '';
+
+  document.getElementById('probe-empty').style.display = 'none';
+  document.getElementById('img-grid').style.display = 'none';
+  document.getElementById('img-grid').innerHTML = '';
+  S.probeResults = [];
+
+  const domain  = document.getElementById('domain').value === 'custom'
+    ? document.getElementById('custom-domain').value.trim()
+    : document.getElementById('domain').value;
+  const size     = document.getElementById('img-size').value;
+  const fmt      = document.getElementById('img-fmt').value;
+  const maxViews = parseInt(document.getElementById('max-views').value);
+
+  logLine(`<span class="ly">▶ Sending ${S.skus.length} SKU(s) to server…</span>`, log);
+
+  try {
+    const res = await fetch('/api/probe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skus: S.skus, domain, size, maxViews, fmt }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Probe failed');
+
+    S.probeResults = data.results;
+    fill.style.width = '100%'; pct.textContent = '100%';
+    label.textContent = `Done — ${data.total} images found`;
+
+    // Render grid
+    const grid = document.getElementById('img-grid');
+    grid.style.display = 'grid';
+    S.probeResults.forEach((r, i) => {
+      const c = document.createElement('div');
+      c.className = 'img-card';
+      c.style.animationDelay = (i * 10) + 'ms';
+      c.innerHTML = `<img src="${r.url}" loading="lazy" alt="${r.sku}_${r.view}">
+        <div class="img-card-info">
+          <div class="img-card-view">View ${r.view}</div>
+          <div class="img-card-sku">${r.sku}</div>
+        </div>`;
+      grid.appendChild(c);
+    });
+
+    // Update stats
+    const skuSet = new Set(S.probeResults.map(r => r.sku));
+    document.getElementById('st-skus').textContent  = skuSet.size;
+    document.getElementById('st-found').textContent = data.total;
+    document.getElementById('st-views').textContent = skuSet.size
+      ? (data.total / skuSet.size).toFixed(1) : '—';
+
+    // Mark step done + update step 2
+    document.getElementById('nav-1').classList.add('done');
+    updateSheetPanel();
+    logLine(`<span class="lg">✓ ${data.total} images found across ${skuSet.size} SKU(s)</span>`, log);
+    showToast(`✓ ${data.total} images found`);
+  } catch(e) {
+    logLine(`<span class="lr">✗ ${e.message}</span>`, log);
+    showToast('Error: ' + e.message);
+    document.getElementById('probe-empty').style.display = 'flex';
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l10 6-10 6V2z"/></svg> Probe images';
+}
+
+/* ════════════════════════════════════════
+   STEP 2 — SHEET
+════════════════════════════════════════ */
+function updateSheetPanel() {
+  if (!S.probeResults.length) return;
+  document.getElementById('sheet-empty').style.display = 'none';
+  document.getElementById('sheet-ready').style.display = 'block';
+  document.getElementById('sh-total').textContent = S.probeResults.length;
+  document.getElementById('sh-skus').textContent  = new Set(S.probeResults.map(r => r.sku)).size;
+}
+
+async function downloadSheet() {
+  if (!S.probeResults.length) { showToast('Probe images first'); return; }
+  try {
+    const res = await fetch('/api/sheet/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ results: S.probeResults }),
+    });
+    if (!res.ok) throw new Error('Sheet generation failed');
+    const blob = await res.blob();
+    dlBlob(blob, 'humanscale-images.xlsx');
+    document.getElementById('nav-2').classList.add('done');
+    showToast('⬇ Sheet downloaded — fill Alt Text, then do Step 3');
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+}
+
+/* ════════════════════════════════════════
+   STEP 3 — UPLOAD
+════════════════════════════════════════ */
+function onFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  S.uploadedFile = file;
+  document.getElementById('dz-filename').textContent = file.name;
+  document.getElementById('upload-btn').disabled = false;
+}
+
+// Drag & drop
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', ()  => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.endsWith('.xlsx')) {
+    S.uploadedFile = file;
+    document.getElementById('dz-filename').textContent = file.name;
+    document.getElementById('upload-btn').disabled = false;
+  }
+});
+
+async function runUpload() {
+  const store = document.getElementById('shopify-store').value.trim().replace(/^https?:\/\//, '');
+  const token = document.getElementById('shopify-token').value.trim();
+  const ver   = document.getElementById('shopify-ver').value;
+
+  if (!store || !token) { showToast('Enter Shopify credentials in the sidebar'); return; }
+  if (!S.uploadedFile)  { showToast('Select an Excel file first'); return; }
+
+  const btn  = document.getElementById('upload-btn');
+  const prog = document.getElementById('upload-progress');
+  const fill = document.getElementById('upload-prog-fill');
+  const lbl  = document.getElementById('upload-prog-label');
+  const pct  = document.getElementById('upload-prog-pct');
+  const log  = document.getElementById('upload-log');
+
+  btn.disabled = true;
+  prog.style.display = 'block'; log.innerHTML = '';
+  document.getElementById('upload-stats').style.display = 'none';
+
+  const formData = new FormData();
+  formData.append('file',    S.uploadedFile);
+  formData.append('store',   store);
+  formData.append('token',   token);
+  formData.append('version', ver);
+
+  let ok = 0, err = 0, total = 0;
+
+  try {
+    const res = await fetch('/api/upload/from-sheet', { method: 'POST', body: formData });
+
+    // Read SSE stream
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let evt;
+        try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+
+        if (evt.type === 'progress') {
+          ok++;
+          const p = Math.round(evt.done / evt.total * 100);
+          fill.style.width  = p + '%';
+          pct.textContent   = p + '%';
+          lbl.textContent   = `Uploading ${evt.done} / ${evt.total}`;
+          logLine(`<span class="ls">↑ ${evt.msg}</span>`, log);
+        } else if (evt.type === 'error') {
+          err++;
+          logLine(`<span class="lr">✗ ${evt.msg}</span>`, log);
+        } else if (evt.type === 'info') {
+          logLine(`<span class="ly">${evt.msg}</span>`, log);
+          total = parseInt((evt.msg.match(/(\d+) images/) || [])[1]) || total;
+        } else if (evt.type === 'done') {
+          ok = evt.ok; err = evt.err; total = evt.total;
+          S.uploadedRows = evt.rows || [];
+          fill.style.width = '100%'; pct.textContent = '100%';
+          lbl.textContent  = `Complete — ${ok} uploaded, ${err} errors`;
+
+          document.getElementById('upload-stats').style.display = 'grid';
+          document.getElementById('up-ok').textContent    = ok;
+          document.getElementById('up-err').textContent   = err;
+          document.getElementById('up-total').textContent = total;
+          document.getElementById('up-pct').textContent   = total ? Math.round(ok/total*100)+'%' : '—';
+          document.getElementById('save-sheet-btn').style.display = 'inline-flex';
+          document.getElementById('nav-3').classList.add('done');
+          showToast(`↑ ${ok} uploaded to Shopify`);
+        }
+      }
+    }
+  } catch(e) {
+    logLine(`<span class="lr">✗ ${e.message}</span>`, log);
+    showToast('Upload error: ' + e.message);
+  }
+
+  btn.disabled = false;
+}
+
+async function saveUpdatedSheet() {
+  if (!S.uploadedRows.length) { showToast('No upload data yet'); return; }
+  try {
+    const res = await fetch('/api/upload/save-sheet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: S.uploadedRows }),
+    });
+    const blob = await res.blob();
+    dlBlob(blob, 'humanscale-uploaded.xlsx');
+    showToast('⬇ Updated sheet downloaded');
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+}
+
+/* ════════════════════════════════════════
+   STEP 4 — JSON
+════════════════════════════════════════ */
+async function generateJSON() {
+  const source  = document.getElementById('json-source').value;
+  const keyMode = document.getElementById('json-keymode').value;
+
+  let data;
+
+  if (source === 'probe') {
+    // Use probe results directly
+    if (!S.probeResults.length) { showToast('Probe images first'); return; }
+    const res = await fetch('/api/json/from-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ results: S.probeResults, keyMode }),
+    });
+    data = await res.json();
+  } else {
+    // Use uploaded sheet
+    if (!S.uploadedFile && !S.uploadedRows.length) { showToast('Upload a sheet first (Step 3)'); return; }
+
+    if (S.uploadedRows.length) {
+      // Build from in-memory rows
+      const res = await fetch('/api/json/from-results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          results: S.uploadedRows.map(r => ({
+            sku:        r['SKU'],
+            view:       r['View'],
+            url:        r['Product URL'],
+            shopifyUrl: r['Shopify URL'] || null,
+            altText:    r['Alt Text'] || '',
+          })),
+          keyMode,
+        }),
+      });
+      data = await res.json();
+    } else {
+      // Use file
+      const form = new FormData();
+      form.append('file', S.uploadedFile);
+      form.append('keyMode', keyMode);
+      const res = await fetch('/api/json/from-sheet', { method: 'POST', body: form });
+      data = await res.json();
+    }
+  }
+
+  if (!data || data.error) { showToast(data?.error || 'Failed'); return; }
+
+  S.jsonData = data;
+  const kc = Object.keys(data).length;
+
+  document.getElementById('json-empty').style.display = 'none';
+  document.getElementById('json-box').style.display = 'block';
+  document.getElementById('json-kc').textContent = `${kc} key${kc !== 1 ? 's' : ''}`;
+  document.getElementById('json-out').innerHTML = syntaxHL(JSON.stringify(data, null, 2));
+  document.getElementById('nav-4').classList.add('done');
+  showToast(`✓ ${kc} JSON keys generated`);
+}
+
+function copyJSON() {
+  navigator.clipboard.writeText(JSON.stringify(S.jsonData, null, 2))
+    .then(() => showToast(`Copied ${Object.keys(S.jsonData).length} keys`));
+}
+
+function downloadJSON() {
+  dlBlob(
+    new Blob([JSON.stringify(S.jsonData, null, 2)], { type: 'application/json' }),
+    'gallery-metafield.json'
+  );
+  showToast('⬇ gallery-metafield.json downloaded');
+}
+
+/* ════════════════════════════════════════
+   UTILS
+════════════════════════════════════════ */
+function logLine(html, el) { el.innerHTML += html + '<br>'; el.scrollTop = el.scrollHeight; }
+
+function syntaxHL(json) {
+  return json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"([^"]+)":/g,'<span class="jk">"$1"</span>:')
+    .replace(/: "([^"]+)"/g,': <span class="js">"$1"</span>')
+    .replace(/: (true|false|null|\d+)/g,': <span class="jn">$1</span>');
+}
+
+function dlBlob(blobOrData, filename) {
+  const blob = blobOrData instanceof Blob ? blobOrData : new Blob([blobOrData]);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename; a.click();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
